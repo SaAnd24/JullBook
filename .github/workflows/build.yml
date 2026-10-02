@@ -21,7 +21,19 @@ jobs:
         with:
           gradle-version: "8.9"
 
+      - name: Localizar proyecto
+        id: proj
+        run: |
+          f=$(find . -name settings.gradle.kts -not -path "*/node_modules/*" | head -n 1)
+          if [ -z "$f" ]; then
+            echo "No se encontró settings.gradle.kts en el repo:"
+            find . -maxdepth 3 -not -path "./.git/*" | head -50
+            exit 1
+          fi
+          echo "dir=$(dirname "$f")" >> "$GITHUB_OUTPUT"
+
       - name: Preparar Gradle Wrapper
+        working-directory: ${{ steps.proj.outputs.dir }}
         run: |
           if [ ! -f gradle/wrapper/gradle-wrapper.jar ]; then
             gradle wrapper --gradle-version 8.9
@@ -29,9 +41,10 @@ jobs:
           chmod +x gradlew
 
       - name: Compilar APK debug
+        working-directory: ${{ steps.proj.outputs.dir }}
         run: ./gradlew assembleDebug --no-daemon --stacktrace
 
       - uses: actions/upload-artifact@v4
         with:
           name: JullBook-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          path: "**/build/outputs/apk/debug/*.apk"
