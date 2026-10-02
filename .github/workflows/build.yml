@@ -21,16 +21,32 @@ jobs:
         with:
           gradle-version: "8.9"
 
-      - name: Localizar proyecto
+      - name: Preparar proyecto
         id: proj
         run: |
-          f=$(find . -name settings.gradle.kts -not -path "*/node_modules/*" | head -n 1)
-          if [ -z "$f" ]; then
-            echo "No se encontró settings.gradle.kts en el repo:"
-            find . -maxdepth 3 -not -path "./.git/*" | head -50
-            exit 1
+          rm -rf _src
+          if [ -f settings.gradle.kts ]; then
+            dir=.
+          else
+            z=$(find . -maxdepth 2 -iname 'JullBook*.zip' -not -path './.git/*' | head -n 1)
+            if [ -z "$z" ]; then
+              echo "No hay settings.gradle.kts ni JullBook*.zip. Contenido:"
+              find . -maxdepth 3 -not -path './.git/*' | head -50
+              exit 1
+            fi
+            echo "Descomprimiendo $z"
+            mkdir _src
+            unzip -q "$z" -d _src
+            f=$(find _src -name settings.gradle.kts | head -n 1)
+            if [ -z "$f" ]; then
+              echo "El ZIP no contiene settings.gradle.kts"
+              find _src -maxdepth 3 | head -50
+              exit 1
+            fi
+            dir=$(dirname "$f")
           fi
-          echo "dir=$(dirname "$f")" >> "$GITHUB_OUTPUT"
+          echo "Proyecto en: $dir"
+          echo "dir=$dir" >> "$GITHUB_OUTPUT"
 
       - name: Preparar Gradle Wrapper
         working-directory: ${{ steps.proj.outputs.dir }}
@@ -48,3 +64,10 @@ jobs:
         with:
           name: JullBook-debug-apk
           path: "**/build/outputs/apk/debug/*.apk"
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: reportes-gradle
+          path: "**/build/reports/**"
+          if-no-files-found: ignore
